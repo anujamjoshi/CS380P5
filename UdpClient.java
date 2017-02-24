@@ -97,18 +97,31 @@ public class UdpClient
 	return shortArray;
 	}
 	private static short checksum(byte[] inputArray) {
-		 long checkSum = 0;
-	        for(int i = 0; i < 10; i++) 
-	        {
-	            checkSum += (inputArray[i] & 0xFFFF);
-	            if ((checkSum & 0xFFFF0000) > 0) 
-	            { 
-	                checkSum &= 0xFFFF;
-	                checkSum++;
-	            }
-	        }
-	        checkSum = ~(checkSum & 0xFFFF); //bitwise inversion
-	        return (short) checkSum; 
+		long sum =0; 
+		int listSize = inputArray.length;
+		int index = 0;
+		while (index < inputArray.length-1){
+			byte first = inputArray[index];
+			byte second = inputArray[index+1];
+			sum+= ((first<<8 & 0xFF00)|(second& 0xFF)); 
+			if ((sum & 0xFFFF0000) >0){
+				sum &= 0xFFFF; 
+				sum++;
+			}
+			index+=2; 
+		}
+		
+		
+		if (listSize%2 == 1){
+
+			byte first = inputArray[index];
+			sum+= ((first<<8 & 0xFF00)); 
+			if ((sum & 0xFFFF0000) >0){
+				sum &= 0xFFFF; 
+				sum++;
+			}
+		}
+		return (short) ~(sum & 0xFFFF); 
 	}
 
 
