@@ -41,8 +41,8 @@ public class UdpClient
 		array [7] =0;
 		//TTL
 		array [8] = 0b00110010;
-		//Protocol TCP 
-		array[9] = 6; 
+		//Protocol UDP 
+		array[9] = 17; 
 		//Temp checksum
 		array[10]=0;
 		array[11] =0; 
