@@ -64,8 +64,11 @@ public class UdpClient
 		array[21] = (byte) 0xAD; 
 		array[22] = (byte) 0xBE; 
 		array[23] = (byte) 0xEF; 
-		
-		short check =checksum (array);
+		byte [] temp = new byte[20];
+		for (int i =0; i <20; i++){
+			temp[i] = array[i];
+		}
+		short check =checksum (temp);
 		array[10]=(byte) (check>>8);
 		array[11] =(byte) check; 
 		os.write(array);
