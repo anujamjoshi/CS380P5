@@ -21,25 +21,77 @@ public class UdpClient
 			os = socket.getOutputStream();
 			 UdpPort= handshake(); 
 			System.out.println("Port number received:" + UdpPort);
-			for (int i=1; i <=12; i++){
+			double []RTT = new double [12];
+ 			for (int i=1; i <=12; i++){
 				int dataSize = (int) Math.pow(2, i);
-				System.out.println("Sending packet with "+dataSize+ "bytes of data");
-				byte[] UDPpacket = createUDP(dataSize);
-				createPacket(UDPpacket);
-				byte[] handArray = new byte [4];
-				is.read(handArray);
-				System.out.print("Handshake response: ");
-				System.out.println(javax.xml.bind.DatatypeConverter.printHexBinary(handArray));
-				
+				System.out.println("Sending packet with "+dataSize+ " bytes of data");
+				byte[] randomData = new byte [dataSize];
+				new Random().nextBytes(randomData);
+				byte [] udp = makeUdp (randomData); 
+				byte[] ipv4 = createPacket(udp);
+				os.write(ipv4);
+				 double start = System.currentTimeMillis();
+				byte[] response = new byte [4];
+				is.read(response);
+				 double end = System.currentTimeMillis();
+				System.out.print("response: ");
+				System.out.println(javax.xml.bind.DatatypeConverter.printHexBinary(response));	
+				RTT[i-1] = (end-start);
+				System.out.printf("RTT: .0f ms \n",(end-start) );
 			}
+ 			double sum = 0; 
+ 			for (double d: RTT){
+ 				sum+=d; 
+ 			}
+ 			System.out.printf("Average RTT is %.2f ms", (sum/12));
 		}
 		catch(Exception e){
 			System.out.println("Error");
 		}
 	}
+	private static  byte [] makeUdp(byte[] randomData) {
+		byte [] udpheader = new byte[8+randomData.length];
+		udpheader[0] = 0;
+		udpheader[1] =0; 
+		//destination 
+		udpheader[2] = (byte) ((UdpPort >>> 8) & 0xFF);
+		udpheader[3] = (byte) (UdpPort & 0xFF);
+		//length 
+		udpheader [4] = (byte) ((udpheader.length >>> 8) & 0xFF );
+		udpheader [5]  = (byte) (udpheader.length & 0xFF);
+		//checksum 
+		udpheader[6] = 0; 
+		udpheader [7] =0 ;
+		for (int i=8; i <udpheader.length; i++){
+			udpheader[i] = randomData[i-8];
+		}
+		byte [] pseudoPacket = new byte [12+udpheader.length];
+		//src 
+		pseudoPacket[0] = (byte) 127;
+		pseudoPacket[1] = (byte) 0;
+		pseudoPacket[2] = (byte) 0;
+		pseudoPacket[3] = (byte) 1;
+		//destination 
+		pseudoPacket [4] = 0b00110100;
+		pseudoPacket[5] = 0b00100001;
+		pseudoPacket[6] = (byte)0xB5;
+		pseudoPacket [7] = 0b1110010;
+		pseudoPacket [8]= 0;
+		pseudoPacket[9] = 17;
+		pseudoPacket[10] = udpheader[4];
+		pseudoPacket[11] = udpheader[5];
+		for (int i =12; i <pseudoPacket.length; i++){
+			pseudoPacket [i] = udpheader[i-12];
+		}
+		short checksumVal = checksum(pseudoPacket);
+		udpheader[6] = (byte) ((checksumVal >>> 8 ) & 0xFF);
+		udpheader[7] = (byte) (checksumVal & 0xFF);
+		return udpheader;
+	}
 	private static int handshake() throws IOException {
 		byte[] data = {(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF};
-		createPacket(data);
+		byte[] array = createPacket(data);
+		os.write(array);
 		byte[] handArray = new byte [4];
 		is.read(handArray);
 		System.out.print("Handshake response: ");
@@ -47,40 +99,15 @@ public class UdpClient
 		int port = is.read() << 8 | is.read();
 		return port; 
 	}
-	public static byte[] createUDP(int dataSize ){
-		byte [] udp = new byte[8+dataSize];
-		//srcPort 
-		udp[0]=0;
-		udp[1]= 0; 
-		//destination port = UdpPort 
-		udp[2] = (byte) (UdpPort>>8 & 0xFF);
-		udp[3] = (byte) (UdpPort & 0xFF);
-		//length 
-		udp[4] = (byte) (udp.length>>8 & 0xFF);
-		udp[5] = (byte) (udp.length & 0xFF);
-		//checksum 
-		udp[6] = 0; 
-		udp [7] =0; 
-		byte [] data = new byte[dataSize];
-		new Random().nextBytes(data);
-		for (int i = 8; i <udp.length; i++){
-			udp[i] = data[i-8];
-		}
-		short check = checksum(udp);
-		udp[6]=(byte) (check>>8);
-		udp[7] =(byte) check; 
-		return udp; 
-		
-	}
-	
-	private static void createPacket(byte[] data) throws IOException {
+
+	private static byte[] createPacket(byte[] data) throws IOException {
 		byte[] array = new byte [20+data.length];
 		// Version + HLen 
 		array [0] = 0b01000101; 
 		// TOS
 		array [1] = 0b00000000; 
 		//Length 
-		short length = (short) (4+20); 
+		short length = (short) (data.length+20); 
 		array [2] = (byte) (length >> 8); 
 		array [3] = (byte) length; 
 		//Indent
@@ -122,7 +149,8 @@ public class UdpClient
 		short check =checksum (temp);
 		array[10]=(byte) (check>>8);
 		array[11] =(byte) check; 
-		os.write(array);
+	//	printPacket(array);
+		return array; 
 		
 	}
 	private static short checksum(byte[] inputArray) {
@@ -153,7 +181,17 @@ public class UdpClient
 		return (short) ~(sum & 0xFFFF); 
 	}
 
-
+	public static void printPacket(byte[] packet) {
+		System.out.println("0        8        16       24");
+		int counter=1;
+		for(byte b: packet) {
+		    System.out.print(Integer.toBinaryString(b & 255 | 256).substring(1) + " ");
+		    if(counter%4 ==0) {
+		    	System.out.println();
+		    }
+		    counter++;
+		}
+	}
 
 }
 
